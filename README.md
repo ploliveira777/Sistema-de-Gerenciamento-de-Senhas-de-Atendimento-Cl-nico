@@ -1,1 +1,398 @@
 # Sistema-de-Gerenciamento-de-Senhas-de-Atendimento-Cl-nico
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+
+#define MAX 500
+
+typedef struct {
+    char nome[100];
+    char genero;
+    int idade;
+    int gestante;
+    int lactante;
+    int necessidadeEspecial;
+    int obeso;
+    char senha[10];
+    char categoria[20];
+} Paciente;
+
+typedef struct {
+    Paciente dados[MAX];
+    int inicio;
+    int fim;
+    int quantidade;
+} Fila;
+
+Fila normal = {{0}, 0, 0, 0};
+Fila preferencial = {{0}, 0, 0, 0};
+Fila urgente = {{0}, 0, 0, 0};
+
+int contadorN = 1;
+int contadorP = 1;
+int contadorU = 1;
+
+Paciente pacienteAtual;
+int existeAtendimento = 0;
+
+// Inicializa uma fila
+void inicializarFila(Fila *fila) {
+    fila->inicio = 0;
+    fila->fim = 0;
+    fila->quantidade = 0;
+}
+
+// Verifica se a fila esta vazia
+int filaVazia(Fila *fila) {
+    return fila->quantidade == 0;
+}
+
+// Verifica se a fila esta cheia
+int filaCheia(Fila *fila) {
+    return fila->quantidade == MAX;
+}
+
+// Adiciona paciente na fila
+void adicionarFila(Fila *fila, Paciente paciente) {
+    if (filaCheia(fila)) {
+        printf("Fila cheia!\n");
+        return;
+    }
+
+    fila->dados[fila->fim] = paciente;
+    fila->fim = (fila->fim + 1) % MAX;
+    fila->quantidade++;
+}
+
+// Remove paciente da fila
+Paciente removerFila(Fila *fila) {
+    Paciente paciente = fila->dados[fila->inicio];
+
+    fila->inicio = (fila->inicio + 1) % MAX;
+    fila->quantidade--;
+
+    return paciente;
+}
+
+// Classifica o paciente
+int classificarPaciente(Paciente p) {
+
+    if (p.idade > 80) {
+        return 3;
+    }
+
+    if ((p.genero == 'F' && p.idade >= 60) ||
+        (p.genero == 'M' && p.idade >= 65) ||
+        p.gestante || p.lactante ||
+        p.necessidadeEspecial || p.obeso) {
+        return 2;
+    }
+
+    return 1;
+}
+
+// Gera senha sequencial
+void gerarSenha(Paciente *p, int categoria) {
+
+    if (categoria == 3) {
+        sprintf(p->senha, "U%03d", contadorU++);
+        strcpy(p->categoria, "URGENTE");
+    }
+    else if (categoria == 2) {
+        sprintf(p->senha, "P%03d", contadorP++);
+        strcpy(p->categoria, "PREFERENCIAL");
+    }
+    else {
+        sprintf(p->senha, "N%03d", contadorN++);
+        strcpy(p->categoria, "NORMAL");
+    }
+}
+
+// Leitura de resposta sim ou nao
+int lerSimNao(char mensagem[]) {
+    char resposta;
+
+    while (1) {
+        printf("%s (S/N): ", mensagem);
+        scanf(" %c", &resposta);
+        resposta = toupper(resposta);
+
+        if (resposta == 'S') return 1;
+        if (resposta == 'N') return 0;
+
+        printf("Resposta invalida!\n");
+    }
+}
+
+// Cadastro de paciente
+void cadastrarPaciente() {
+
+    Paciente p;
+    int categoria;
+
+    if (normal.quantidade +
+        preferencial.quantidade +
+        urgente.quantidade >= MAX * 3) {
+        printf("Limite de pacientes atingido!\n");
+        return;
+    }
+
+    if (existeAtendimento &&
+        normal.quantidade + preferencial.quantidade +
+        urgente.quantidade >= MAX * 3) {
+        printf("Sistema sem capacidade!\n");
+        return;
+    }
+
+    printf("\n===== CADASTRO DE PACIENTE =====\n");
+
+    printf("Nome: ");
+    scanf(" %99[^\n]", p.nome);
+
+    do {
+        printf("Genero (M/F): ");
+        scanf(" %c", &p.genero);
+        p.genero = toupper(p.genero);
+
+        if (p.genero != 'M' && p.genero != 'F')
+            printf("Genero invalido!\n");
+
+    } while (p.genero != 'M' && p.genero != 'F');
+
+    do {
+        printf("Idade: ");
+        scanf("%d", &p.idade);
+
+        if (p.idade < 0 || p.idade > 130)
+            printf("Idade invalida!\n");
+
+    } while (p.idade < 0 || p.idade > 130);
+
+    p.gestante = 0;
+
+    if (p.genero == 'F') {
+        p.gestante = lerSimNao("Esta gestante?");
+    }
+
+    p.lactante = lerSimNao("E lactante?");
+    p.necessidadeEspecial =
+        lerSimNao("Possui necessidade especial?");
+    p.obeso = lerSimNao("Possui condicao de obesidade?");
+
+    categoria = classificarPaciente(p);
+
+    gerarSenha(&p, categoria);
+
+    if (categoria == 3) {
+        adicionarFila(&urgente, p);
+    }
+    else if (categoria == 2) {
+        adicionarFila(&preferencial, p);
+    }
+    else {
+        adicionarFila(&normal, p);
+    }
+
+    printf("\nPaciente cadastrado com sucesso!\n");
+    printf("Nome: %s\n", p.nome);
+    printf("Senha: %s\n", p.senha);
+    printf("Categoria: %s\n", p.categoria);
+}
+
+// Consulta proximo paciente
+void consultarProximo() {
+
+    if (!filaVazia(&urgente)) {
+        printf("Proxima senha: %s\n",
+               urgente.dados[urgente.inicio].senha);
+    }
+    else if (!filaVazia(&preferencial)) {
+        printf("Proxima senha: %s\n",
+               preferencial.dados[preferencial.inicio].senha);
+    }
+    else if (!filaVazia(&normal)) {
+        printf("Proxima senha: %s\n",
+               normal.dados[normal.inicio].senha);
+    }
+    else {
+        printf("Nao existem pacientes aguardando.\n");
+    }
+}
+
+// Chama proximo paciente
+void chamarProximo() {
+
+    if (existeAtendimento) {
+        printf("Finalize o atendimento atual primeiro!\n");
+        return;
+    }
+
+    if (!filaVazia(&urgente)) {
+        pacienteAtual = removerFila(&urgente);
+    }
+    else if (!filaVazia(&preferencial)) {
+        pacienteAtual = removerFila(&preferencial);
+    }
+    else if (!filaVazia(&normal)) {
+        pacienteAtual = removerFila(&normal);
+    }
+    else {
+        printf("Nao existem pacientes na fila!\n");
+        return;
+    }
+
+    existeAtendimento = 1;
+
+    printf("\n===== CHAMADA DE PACIENTE =====\n");
+    printf("Senha: %s\n", pacienteAtual.senha);
+    printf("Nome: %s\n", pacienteAtual.nome);
+    printf("Categoria: %s\n", pacienteAtual.categoria);
+}
+
+// Finaliza atendimento
+void finalizarAtendimento() {
+
+    if (!existeAtendimento) {
+        printf("Nenhum atendimento em andamento!\n");
+        return;
+    }
+
+    printf("\nAtendimento finalizado!\n");
+    printf("Paciente: %s\n", pacienteAtual.nome);
+    printf("Senha: %s\n", pacienteAtual.senha);
+
+    existeAtendimento = 0;
+}
+
+// Mostra quantidade de pacientes
+void exibirFilas() {
+
+    printf("\n===== FILAS DE ESPERA =====\n");
+
+    printf("Urgentes: %d\n", urgente.quantidade);
+    printf("Preferenciais: %d\n", preferencial.quantidade);
+    printf("Normais: %d\n", normal.quantidade);
+
+    printf("Total aguardando: %d\n",
+        urgente.quantidade +
+        preferencial.quantidade +
+        normal.quantidade);
+}
+
+// Exibe painel de chamada
+void exibirPainel() {
+
+    printf("\n================================\n");
+    printf("       PAINEL DA CLINICA\n");
+    printf("================================\n");
+
+    if (existeAtendimento) {
+        printf("EM ATENDIMENTO: %s\n",
+               pacienteAtual.senha);
+        printf("PACIENTE: %s\n", pacienteAtual.nome);
+        printf("CATEGORIA: %s\n", pacienteAtual.categoria);
+    }
+    else {
+        printf("EM ATENDIMENTO: NENHUM\n");
+    }
+
+    printf("\nPROXIMAS SENHAS:\n");
+
+    Fila *filas[] = {&urgente, &preferencial, &normal};
+
+    for (int i = 0; i < 3; i++) {
+        Fila *f = filas[i];
+
+        for (int j = 0; j < f->quantidade; j++) {
+            int pos = (f->inicio + j) % MAX;
+
+            printf("%s - %s\n",
+                f->dados[pos].senha,
+                f->dados[pos].categoria);
+        }
+    }
+
+    exibirFilas();
+
+    printf("================================\n");
+}
+
+// Menu principal
+void exibirMenu() {
+
+    printf("\n===== SISTEMA DE SENHAS =====\n");
+    printf("1 - Cadastrar paciente\n");
+    printf("2 - Consultar proxima senha\n");
+    printf("3 - Chamar proximo paciente\n");
+    printf("4 - Finalizar atendimento\n");
+    printf("5 - Exibir painel\n");
+    printf("6 - Exibir filas\n");
+    printf("0 - Encerrar sistema\n");
+    printf("Escolha: ");
+}
+
+int main() {
+
+    int opcao;
+
+    inicializarFila(&normal);
+    inicializarFila(&preferencial);
+    inicializarFila(&urgente);
+
+    do {
+
+        exibirMenu();
+
+        if (scanf("%d", &opcao) != 1) {
+            printf("Entrada invalida!\n");
+
+            int c;
+            while ((c = getchar()) != '\n' && c != EOF);
+
+            continue;
+        }
+
+        switch (opcao) {
+
+            case 1:
+                cadastrarPaciente();
+                break;
+
+            case 2:
+                consultarProximo();
+                break;
+
+            case 3:
+                chamarProximo();
+                break;
+
+            case 4:
+                finalizarAtendimento();
+                break;
+
+            case 5:
+                exibirPainel();
+                break;
+
+            case 6:
+                exibirFilas();
+                break;
+
+            case 0:
+                if (existeAtendimento) {
+                    printf("Finalize o atendimento antes de sair!\n");
+                } else {
+                    printf("Sistema encerrado!\n");
+                }
+                break;
+
+            default:
+                printf("Opcao invalida!\n");
+        }
+
+    } while (opcao != 0 || existeAtendimento);
+
+    return 0;
+}
