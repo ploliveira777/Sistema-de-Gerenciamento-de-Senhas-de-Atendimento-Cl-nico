@@ -1,0 +1,1 @@
+# Sistema-de-Gerenciamento-de-Senhas-de-Atendimento-Cl-nico
